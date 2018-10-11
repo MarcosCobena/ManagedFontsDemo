@@ -1,0 +1,78 @@
+<Window 
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="FontsDemo"
+    Width="640"
+    Height="480"
+    WindowState="Maximized">
+    
+    <TabControl>
+        
+        <TabItem
+            Header="Font">
+            
+            <StackPanel>
+            
+                <DropDown Name="FontsDropDown" />
+                
+            </StackPanel>
+            
+        </TabItem>
+        
+        <TabItem
+            Header="Glyphs">
+            
+            <ListBox Name="GlyphsListBox"
+                VirtualizationMode="None">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        
+                        <StackPanel
+                            Orientation="Horizontal"
+                            Margin="10">
+                            
+                            <Border
+                                Width="100"
+                                Height="100"
+                                Background="Fuchsia">
+                                
+                                <Image
+                                    Source="{Binding Item2}" />
+                                
+                            </Border>
+                            
+                            <TextBlock 
+                                Text="{Binding Item1}"
+                                VerticalAlignment="Center"
+                                Margin="10" />
+                            
+                        </StackPanel>
+                        
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+                
+            </ListBox>
+            
+        </TabItem>
+        
+        <TabItem
+            Header="Free text">
+            
+            <Grid 
+                Background="Fuchsia"
+                RowDefinitions="Auto,*">
+                
+                <TextBox Name="InputTextBox"
+                    AcceptsReturn="True" />
+                
+                <Image Name="OutputImage"
+                    Grid.Row="1"
+                    Stretch="Uniform" />
+                
+            </Grid>
+            
+        </TabItem>
+        
+    </TabControl>
+        
+</Window>
