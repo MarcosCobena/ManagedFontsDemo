@@ -53,13 +53,16 @@ namespace FontsDemo
             _glyphsListBox = this.FindControl<ListBox>("GlyphsListBox");
 
             _inputTextBox = this.FindControl<TextBox>("InputTextBox");
-            _inputTextBox.TextInput += UpdateRenderImage;
+            //_inputTextBox.TextInput += UpdateRenderImage;
+            _inputTextBox.KeyDown += UpdateRenderImage;
 
             _outputImage = this.FindControl<Image>("OutputImage");
         }
 
         private void UpdateFont(object sender, SelectionChangedEventArgs e)
         {
+            _glyphsListBox.Items = null;
+
             var dropDown = sender as DropDown;
             var fontFamily = dropDown.SelectedItem as FontFamily;
             _font = fontFamily.CreateFont(DefaultFontSize);
