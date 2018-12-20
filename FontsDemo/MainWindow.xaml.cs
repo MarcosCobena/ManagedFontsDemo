@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -12,6 +11,7 @@ using Avalonia.Threading;
 using SixLabors.Fonts;
 using SixLabors.Fonts.Exceptions;
 using SixLabors.ImageSharp.PixelFormats;
+using System.Collections.ObjectModel;
 
 namespace FontsDemo
 {
@@ -23,6 +23,7 @@ namespace FontsDemo
 
         private readonly string _asciiChars;
         private readonly string _workingDirectory;
+        private readonly string _outputDirectory;
         private readonly string _renderOutputPath;
 
         private DropDown _fontsDropDown;
@@ -35,9 +36,10 @@ namespace FontsDemo
         {
             var location = Assembly.GetEntryAssembly().Location;
             _workingDirectory = Path.GetDirectoryName(location);
+            _outputDirectory = Path.Combine(_workingDirectory, GlyphsDirectoryName);
             _renderOutputPath = Path.Combine(_workingDirectory, RenderFileName);
 
-            InitializeComponent();
+            AvaloniaXamlLoader.Load(this);
             InitializeControls();
 
             _asciiChars = GetASCIIChars();
@@ -45,30 +47,33 @@ namespace FontsDemo
             PopulateFonts();
         }
 
+        public ObservableCollection<Tuple<char, Bitmap>> Glyphs { get; } = 
+            new ObservableCollection<Tuple<char, Bitmap>>();
+
+        private void CreateGlyph(char @char) =>
+            Task.Run(() =>
+            {
+                var safeFileName = $"{(byte)@char}.png";
+                var outputPath = Path.Combine(_outputDirectory, safeFileName);
+                FontRasterizer.RenderText(_font, @char.ToString(), outputPath, Rgba32.White);
+                var bitmap = new Bitmap(outputPath);
+                var glyph = Tuple.Create(@char, bitmap);
+                Dispatcher.UIThread.InvokeAsync(() => Glyphs.Add(glyph));
+            });
+
         private void InitializeControls()
         {
             _fontsDropDown = this.FindControl<DropDown>("FontsDropDown");
             _fontsDropDown.SelectionChanged += UpdateFont;
 
             _glyphsListBox = this.FindControl<ListBox>("GlyphsListBox");
+            _glyphsListBox.Items = Glyphs;
 
             _inputTextBox = this.FindControl<TextBox>("InputTextBox");
             //_inputTextBox.TextInput += UpdateRenderImage;
             _inputTextBox.KeyDown += UpdateRenderImage;
 
             _outputImage = this.FindControl<Image>("OutputImage");
-        }
-
-        private void UpdateFont(object sender, SelectionChangedEventArgs e)
-        {
-            _glyphsListBox.Items = null;
-
-            var dropDown = sender as DropDown;
-            var fontFamily = dropDown.SelectedItem as FontFamily;
-            _font = fontFamily.CreateFont(DefaultFontSize);
-
-            PopulateGlyphs();
-            UpdateRenderImage(_inputTextBox, null);
         }
 
         private void PopulateFonts()
@@ -102,31 +107,29 @@ namespace FontsDemo
 
         private void PopulateGlyphs()
         {
-            Task.Run(() =>
+            if (Directory.Exists(_outputDirectory))
             {
-                var outputDirectory = Path.Combine(_workingDirectory, GlyphsDirectoryName);
+                Directory.Delete(_outputDirectory, true);
+            }
 
-                if (Directory.Exists(outputDirectory))
-                {
-                    Directory.Delete(outputDirectory, true);
-                }
+            Directory.CreateDirectory(_outputDirectory);
 
-                Directory.CreateDirectory(outputDirectory);
+            foreach (var @char in _asciiChars)
+            {
+                CreateGlyph(@char);
+            }
+        }
 
-                var glyphs = new List<object>();
+        private void UpdateFont(object sender, SelectionChangedEventArgs e)
+        {
+            Glyphs.Clear();
 
-                foreach (var item in _asciiChars)
-                {
-                    var safeFileName = $"{(byte)item}.png";
-                    var outputPath = Path.Combine(outputDirectory, safeFileName);
-                    FontRasterizer.RenderText(_font, item.ToString(), outputPath, Rgba32.White);
-                    var bitmap = new Bitmap(outputPath);
-                    var glyph = Tuple.Create(item, bitmap);
-                    glyphs.Add(glyph);
-                }
+            var dropDown = sender as DropDown;
+            var fontFamily = dropDown.SelectedItem as FontFamily;
+            _font = fontFamily.CreateFont(DefaultFontSize);
 
-                Dispatcher.UIThread.InvokeAsync(() => _glyphsListBox.Items = glyphs);
-            });
+            PopulateGlyphs();
+            UpdateRenderImage(_inputTextBox, null);
         }
 
         private void UpdateRenderImage(object sender, EventArgs e)
@@ -142,12 +145,7 @@ namespace FontsDemo
             });
         }
 
-        private void InitializeComponent()
-        {
-            AvaloniaXamlLoader.Load(this);
-        }
-
-        private static string GetASCIIChars() => 
+        private static string GetASCIIChars() =>
             string.Concat(Enumerable.Range(0, 256).Select(index => (char)index));
     }
 }
