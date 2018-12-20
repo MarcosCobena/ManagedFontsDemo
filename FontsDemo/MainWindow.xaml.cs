@@ -29,7 +29,8 @@ namespace FontsDemo
         private ListBox _glyphsListBox;
         private TextBox _inputTextBox;
         private Image _outputImage;
-        private Font _font;
+        private Font _fontSixLabors;
+        private SharpFont.FontFace _fontSharpFont;
 
         public MainWindow()
         {
@@ -53,7 +54,6 @@ namespace FontsDemo
             _glyphsListBox = this.FindControl<ListBox>("GlyphsListBox");
 
             _inputTextBox = this.FindControl<TextBox>("InputTextBox");
-            //_inputTextBox.TextInput += UpdateRenderImage;
             _inputTextBox.KeyDown += UpdateRenderImage;
 
             _outputImage = this.FindControl<Image>("OutputImage");
@@ -64,43 +64,19 @@ namespace FontsDemo
             _glyphsListBox.Items = null;
 
             var dropDown = sender as DropDown;
-            var fontFamily = dropDown.SelectedItem as FontFamily;
-            _font = fontFamily.CreateFont(DefaultFontSize);
-
-            PopulateGlyphs();
+            PopulateGlyphs(dropDown.SelectedItem as string);
             UpdateRenderImage(_inputTextBox, null);
         }
 
         private void PopulateFonts()
         {
-            Task.Run(() =>
-            {
-                var fonts = new FontCollection();
-
-                var fontPaths = Directory.EnumerateFiles("/Library/Fonts", "*.ttf");
-
-                foreach (var item in fontPaths)
-                {
-                    try
-                    {
-                        var fontFamily = fonts.Install(item);
-                    }
-                    catch (InvalidFontFileException)
-                    {
-                        Trace.WriteLine($"Ops, I couldn't load {item}");
-                    }
-                }
-
-                Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    _fontsDropDown.Items = fonts.Families;
-                    var firstFontFamily = fonts.Families.FirstOrDefault();
-                    _fontsDropDown.SelectedItem = firstFontFamily;
-                });
-            });
+            var fontPaths = Directory.EnumerateFiles("/Library/Fonts", "*.ttf");
+            _fontsDropDown.Items = fontPaths;
+            var firstFont = fontPaths.FirstOrDefault();
+            _fontsDropDown.SelectedItem = firstFont;
         }
 
-        private void PopulateGlyphs()
+        private void PopulateGlyphs(string fontPath)
         {
             Task.Run(() =>
             {
@@ -114,19 +90,58 @@ namespace FontsDemo
                 Directory.CreateDirectory(outputDirectory);
 
                 var glyphs = new List<object>();
+                //LoadFontThroughSixLabors(fontPath);
+                LoadFontThroughSharpFont(fontPath);
 
                 foreach (var item in _asciiChars)
                 {
                     var safeFileName = $"{(byte)item}.png";
                     var outputPath = Path.Combine(outputDirectory, safeFileName);
-                    FontRasterizer.RenderText(_font, item.ToString(), outputPath, Rgba32.White);
-                    var bitmap = new Bitmap(outputPath);
-                    var glyph = Tuple.Create(item, bitmap);
-                    glyphs.Add(glyph);
+                    //FontRasterizer.RenderTextWithSixLabors(_fontSixLabors, item.ToString(), outputPath, Rgba32.White);
+                    FontRasterizer.RenderTextWithSharpFont(_fontSharpFont, item, outputPath, Rgba32.White);
+
+                    if (File.Exists(outputPath))
+                    {
+                        var bitmap = new Bitmap(outputPath);
+                        var glyph = Tuple.Create(item, bitmap);
+                        glyphs.Add(glyph);
+                    }
                 }
 
                 Dispatcher.UIThread.InvokeAsync(() => _glyphsListBox.Items = glyphs);
             });
+        }
+
+        private void InitializeComponent()
+        {
+            AvaloniaXamlLoader.Load(this);
+        }
+
+        private void LoadFontThroughSharpFont(string fontPath)
+        {
+            try
+            {
+                _fontSharpFont = new SharpFont.FontFace(File.OpenRead(fontPath));
+            }
+            catch (SharpFont.InvalidFontException)
+            {
+                Trace.WriteLine($"Ops, I couldn't load {Path.GetFileName(fontPath)}");
+            }
+        }
+
+        private void LoadFontThroughSixLabors(string fontPath)
+        {
+            var fontCollection = new FontCollection();
+
+            try
+            {
+                var fontFamily = fontCollection.Install(fontPath);
+                _fontSixLabors = fontFamily.CreateFont(DefaultFontSize);
+            }
+            catch (InvalidFontFileException)
+            {
+                Trace.WriteLine($"Ops, I couldn't load {Path.GetFileName(fontPath)}");
+            }
         }
 
         private void UpdateRenderImage(object sender, EventArgs e)
@@ -136,15 +151,10 @@ namespace FontsDemo
 
             Task.Run(() =>
             {
-                FontRasterizer.RenderText(_font, text, _renderOutputPath);
+                FontRasterizer.RenderTextWithSixLabors(_fontSixLabors, text, _renderOutputPath);
 
                 Dispatcher.UIThread.InvokeAsync(() => _outputImage.Source = new Bitmap(_renderOutputPath));
             });
-        }
-
-        private void InitializeComponent()
-        {
-            AvaloniaXamlLoader.Load(this);
         }
 
         private static string GetASCIIChars() => 
